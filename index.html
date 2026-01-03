@@ -126,24 +126,11 @@
       <p class="hint" style="margin-top:6px;">Tip: If no year is typed, we’ll ignore the year filter. Rows marked “All” are generic (e.g., Dashcam installs).</p>
     </div>
   </div>
+<!-- Vehicle Parts (manual fallback) - removed from UI (TDJ selector used instead) -->
+<input id="vehiclePartsPrice" type="number" value="0" style="display:none;" />
 
-  <!-- Vehicle Parts (manual fallback) -->
-  <div class="flex">
-    <div class="col">
-      <label>Vehicle-Specific Parts Price</label>
-      <input id="vehiclePartsPrice" type="number" min="0" step="0.01" value="0" />
-    </div>
-  </div>
+<!-- Key Features Toggle -->
 
-  <div>
-    <button class="btn" type="button" id="togglePartsBtn">Show Vehicle-Specific Parts</button>
-    <div id="vehiclePartsSection" style="display:none; margin-top:10px;">
-      <label>Select Vehicle-Specific Parts Required:</label>
-      <div id="vehiclePartsOptions"></div>
-    </div>
-  </div>
-
-  <!-- Key Features Toggle -->
   <div>
     <label><input id="showKeyFeatures" type="checkbox" checked /> Show Key Features in Quote</label>
   </div>
@@ -151,16 +138,16 @@
   <!-- =================== AERPRO SELECTOR + TDJ PRICING =================== -->
   <hr />
   <h3 style="margin-bottom:6px;">Vehicle Selector (Aerpro) & TDJ Pricing</h3>
-  <div id="apStatus" class="hint" style="margin:6px 0;"></div>
-  <div id="apDiag" class="ap-diag" style="display:none;"></div>
-  <p class="ap-hint">Pick the exact vehicle below. We’ll fetch the matching Aerpro parts, price them from your TDJ sheet, and you can choose which parts to include in the quote.</p>
+  <div id="apStatus" class="hint" style="margin:6px 0;display:none;"></div>
+  <div id="apDiag" class="ap-diag" style="display:none;display:none;"></div>
+  <p class="ap-hint" style="display:none;">Pick the exact vehicle below. We’ll fetch the matching Aerpro parts, price them from your TDJ sheet, and you can choose which parts to include in the quote.</p>
 
-  <div class="ap-bar">
+  <div class="ap-bar" style="display:none;">
     <span class="small">GST handling:</span>
     <label class="small"><input type="radio" name="gstmode" value="inc" checked> RRP includes GST</label>
     <label class="small"><input type="radio" name="gstmode" value="ex"> RRP excludes GST (add 10%)</label>
     <label class="small">Margin %: <input type="number" id="marginPct" value="0" min="0" step="1" style="width:70px;"></label>
-    <label class="small"><input type="checkbox" id="useAerproInQuote"> Use these parts in the quote</label>
+    <label class="small"><input type="checkbox" id="useAerproInQuote" checked> Use these parts in the quote</label>
   </div>
 
   <!-- Aerpro selector widget -->
@@ -200,7 +187,8 @@
   <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;">
     <button class="btn" id="generateBtn">Generate Quote</button>
     <button class="btn" id="copyBtn">Copy Text Only</button>
-    <button class="btn" id="copyHtmlBtn">📋 Copy Quote with Images</button>
+        <button class="btn" id="copyItemsHtmlBtn">📋 Copy Items Only</button>
+<button class="btn" id="copyHtmlBtn">📋 Copy Quote with Images</button>
   </div>
 
   <div id="quotePreview" class="quote-preview"></div>
@@ -489,7 +477,12 @@
             <div><label>Parts Price:</label><input type="number" min="0" step="0.01" value="${p.partsPrice}" onchange="editProductPartsPriceById('${p.id}', this.value)" /></div>
             <div><label>Key Features:</label><textarea onchange="editProductKeyFeatById('${p.id}', this.value)">${p.keyFeat}</textarea></div>
           </div>
-        </div>`;
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>`;
       });
     }
     byId('productSearch').addEventListener('input', renderProductList);
@@ -519,14 +512,6 @@
     }
     window.toggleExtraById=id=>{const e=extras.find(x=>x.id===id); if(e) e.checked=!e.checked;}
     window.editExtraPriceById=(id,v)=>{const e=extras.find(x=>x.id===id); if(e) e.price=parsePrice(v);}
-
-    // ===================== Manual vehicle parts options (fallback) ======================
-    function renderVehiclePartsOptions(){ const div=byId('vehiclePartsOptions'); div.innerHTML=''; vehiclePartsList.forEach(part=>{ div.innerHTML += `<label style="display:block;"><input type="checkbox" class="vehiclePartCheckbox" value="${part}"> ${part}</label>`; }); }
-    byId('togglePartsBtn').addEventListener('click', () => {
-      const section = byId('vehiclePartsSection');
-      if(section.style.display === 'none'){ section.style.display = 'block'; byId('togglePartsBtn').textContent = 'Hide Vehicle-Specific Parts'; }
-      else { section.style.display = 'none'; byId('togglePartsBtn').textContent = 'Show Vehicle-Specific Parts'; }
-    });
 
     // ===================== Showcase & OEM suggestions ======================
     function getSelectedProductCategories(){ return products.filter(p => p.checked).map(p => p.category); }
@@ -597,6 +582,14 @@
       if (vehicleStr) ctxBits.push(vehicleStr);
       if (year) ctxBits.push(String(year));
       byId('oemContext').textContent = ctxBits.length ? `Matched for: ${ctxBits.join(' · ')}` : '';
+    }
+
+    // ===================== Vehicle-Specific Parts (legacy UI removed) =====================
+    // Older versions of the quoter had a manual vehicle-parts list + price field.
+    // We now use the Aerpro/TDJ selector instead, but some code paths still call this.
+    // Keep as a harmless no-op so Aerpro/TDJ initialisation continues normally.
+    function renderVehiclePartsOptions(){
+      // Intentionally blank
     }
 
     function renderOem(list){
@@ -811,10 +804,14 @@ Total: ${money(total)}`;
       byId('marginPct').addEventListener('input', () => { apItems.forEach(i=>i.adjPrice = withGSTandMargin(i.baseRRP)); apRecalcTotal(); renderApProducts(); });
     }
 
-    // ===================== QUOTE BUILD ======================
+        // Stores a paste-ready HTML fragment containing only parts + products (no intro/outro/service/showcase)
+    let lastItemsOnlyHtml = '';
+
+// ===================== QUOTE BUILD ======================
     byId('generateBtn').addEventListener('click', generateQuote);
     byId('copyBtn').addEventListener('click', copyQuoteTextOnly);
     byId('copyHtmlBtn').addEventListener('click', copyQuoteHtml);
+    byId('copyItemsHtmlBtn').addEventListener('click', copyItemsOnlyHtml);
     byId('apFilter')?.addEventListener('input', ()=>{});
 
     function generateQuote(){
@@ -865,9 +862,9 @@ Total: ${money(total)}`;
         const totalInstalled = (item.price||0) + (item.install||0) + (usePartsPrice||0) + itemExtrasTotal;
 
         productHtml += `
-        <div style="font-family:Arial,sans-serif;max-width:600px;padding:10px;border:1px solid #ddd;margin-bottom:20px;">
+        <div style="font-family:Arial,sans-serif;max-width:640px;padding:10px;border:1px solid #ddd;margin-bottom:20px;">
           <h2>📦 <span style="color:#0066cc;">${item.brand} ${item.model}</span></h2>
-          ${item.imgUrl ? `<img src="${item.imgUrl}" style="width:200px;border-radius:4px;margin:10px 0;" />` : ''}
+          ${item.imgUrl ? `<img src="${item.imgUrl}" alt="${(item.brand||'') + ' ' + (item.model||'')}" style="width:100%;max-width:360px;height:auto;display:block;margin:10px auto 12px auto;border-radius:8px;" />` : ''}
           <p><strong>🔍 Description:</strong> ${item.desc}</p>
           ${showKeyFeatures && item.keyFeat ? `<p><strong>🌟 Key Features:</strong><br />${item.keyFeat}</p>` : ''}
           ${item.category.toLowerCase() === 'indash av' ? `
@@ -933,24 +930,52 @@ if (firstCat && categoryOpenings[firstCat]) {
       if (byId('useAerproInQuote').checked && apItems.length){
         const chosen = apItems.filter(i => apSelectedSkus.has(i.sku));
         if (chosen.length){
-          const itemsHtml = chosen.map(i => `
-            <div class="email-parts-item">
-              ${i.img ? `<img src="${i.img}" alt="${i.title}">` : ''}
-              <div class="email-parts-meta">
-                <b>${i.title}</b>
-                <div>SKU: ${i.sku}</div>
-                <div>${money(i.adjPrice)}</div>
-              </div>
-            </div>
-          `).join('');
+
+          // Email-safe 2-column table layout (best compatibility with iOS Mail paste):
+          // - Always renders 2 items per row on desktop and mobile
+          // - Uses only tables + inline styles (no grid/flex/classes)
+          let rowsHtml = '';
+          for (let idx = 0; idx < chosen.length; idx += 2) {
+            const a = chosen[idx];
+            const b = chosen[idx + 1];
+
+            const cell = (i) => {
+              if (!i) return `<td width="50%" style="padding:6px; vertical-align:top;"></td>`;
+              return `
+                <td width="50%" style="padding:6px; vertical-align:top;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                    style="border:1px solid #ddd; border-radius:8px; background:#fff; border-collapse:separate;">
+                    <tr>
+                      <td style="padding:8px; vertical-align:middle; width:84px;">
+                        ${i.img ? `<img src="${i.img}" alt="${(i.title||'').replace(/"/g,'&quot;')}"
+                          style="width:74px; height:74px; object-fit:contain; border-radius:6px; display:block;" />` : ``}
+                      </td>
+                      <td style="padding:8px; vertical-align:middle; font-family:Arial,sans-serif;">
+                        <div style="font-size:13px; font-weight:bold; margin-bottom:4px; color:#111;">${i.title}</div>
+                        <div style="font-size:12px; color:#374151; margin-bottom:2px;">SKU: ${i.sku}</div>
+                        <div style="font-size:12px; color:#111; font-weight:bold;">${money(i.adjPrice)}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              `;
+            };
+
+            rowsHtml += `<tr>${cell(a)}${cell(b)}</tr>`;
+          }
+
           aerproEmailBlock = `
-            <div style="margin:14px 0 22px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff;">
-              <p style="margin:0 0 8px 0; font-weight:bold;">Vehicle-specific conversion parts ${apVehicleLabel ? `for ${apVehicleLabel}` : ''}</p>
-              <div class="email-parts-grid">${itemsHtml}</div>
-              <div style="margin-top:10px; font-weight:bold;">Parts subtotal: ${money(parseFloat(byId('apPartsTotal').value||'0'))}</div>
+            <div style="margin:14px 0 22px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; font-family:Arial,sans-serif;">
+              <p style="margin:0 0 10px 0; font-weight:bold;">Vehicle-specific conversion parts ${apVehicleLabel ? `for ${apVehicleLabel}` : ''}</p>
+
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                ${rowsHtml}
+              </table>
+
+              <div style="margin-top:6px; font-weight:bold; font-size:14px;">Parts subtotal: ${money(parseFloat(byId('apPartsTotal').value||'0'))}</div>
             </div>
           `;
-        }
+}
       }
 
       const closing = `
@@ -960,20 +985,54 @@ if (firstCat && categoryOpenings[firstCat]) {
         <p>Kind regards,<br>Shane</p>`;
 
       byId('quotePreview').innerHTML = `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;">
-          <p><strong>Email:</strong> ${customerEmail}</p>
-          ${opening}
-          ${oemHtml}
-          <p style="text-align:center;font-weight:bold;">Enjoy convenient on-site installation within our local service area — bringing professional car tech upgrades directly to you.</p>
-          <div style="max-width:600px;margin:20px 0;">
-            <img src="https://static.wixstatic.com/media/4abfde_eceea2aff22e4bc5aa317c57c9aed84b~mv2.jpg/v1/fill/w_702,h_450,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Service-Area-2.jpg" style="width:100%;border-radius:4px;" />
-          </div>
-          ${aerproEmailBlock}
-          ${productHtml}
-          ${showcaseHtml}
-          ${closing}
-        </div>`;
-    }
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+          <tr>
+            <td align="center" style="padding:0;">
+              <!-- Email container -->
+              <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:100%; max-width:640px;">
+                <tr>
+                  <td style="font-family:Arial,sans-serif; padding:20px;">
+                    <p style="margin:0 0 10px 0;"><strong>Email:</strong> ${customerEmail}</p>
+                    <div style="border:1px solid #e5e7eb; border-radius:10px; padding:12px; margin:0 0 18px 0;">${opening}</div>
+                    ${oemHtml}
+
+                    <p style="text-align:center;font-weight:bold; margin:18px 0 10px 0;">
+                      Enjoy convenient on-site installation within our local service area — bringing professional car tech upgrades directly to you.
+                    </p>
+
+                    <img src="https://static.wixstatic.com/media/4abfde_eceea2aff22e4bc5aa317c57c9aed84b~mv2.jpg/v1/fill/w_702,h_450,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Service-Area-2.jpg"
+                         alt="Service Area"
+                         style="width:100%; max-width:640px; border-radius:4px; display:block; margin:0 0 18px 0;" />
+
+                    ${aerproEmailBlock}
+                    ${productHtml}
+                    ${showcaseHtml}
+                    ${closing}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>`;
+    
+      // Build a copy-friendly fragment containing only the selected parts + products
+      lastItemsOnlyHtml = `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+          <tr>
+            <td align="center" style="padding:0;">
+              <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:100%; max-width:640px;">
+                <tr>
+                  <td style="font-family:Arial,sans-serif; padding:0 20px 20px 20px;">
+                    ${aerproEmailBlock}
+                    ${productHtml}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `;
+}
 
     function copyQuoteTextOnly(){
       const html = byId('quotePreview').innerHTML;
@@ -982,7 +1041,18 @@ if (firstCat && categoryOpenings[firstCat]) {
       const text = temp.innerText;
       navigator.clipboard.writeText(text).then(()=>alert('Quote text copied to clipboard!'));
     }
-    function copyQuoteHtml(){
+    
+    function copyItemsOnlyHtml(){
+      const html = lastItemsOnlyHtml || '';
+      if(!html){ alert('Generate a quote first.'); return; }
+      if (navigator.clipboard && window.ClipboardItem) {
+        const blob = new Blob([html], { type: "text/html" });
+        const data = [new ClipboardItem({ "text/html": blob })];
+        navigator.clipboard.write(data).then(()=>alert('Items-only HTML copied! (parts + products)')).catch(()=>copyQuoteTextOnly());
+      } else { copyQuoteTextOnly(); }
+    }
+
+function copyQuoteHtml(){
       const html = byId('quotePreview').innerHTML;
       if (navigator.clipboard && window.ClipboardItem) {
         const blob = new Blob([html], { type: "text/html" });
@@ -995,6 +1065,18 @@ if (firstCat && categoryOpenings[firstCat]) {
     // Init
     window.addEventListener('load', async () => {
       initAerproControls();
+      // Shane default preferences: always RRP includes GST, no margin, and always include selected parts
+      try {
+        const inc = document.querySelector('input[name="gstmode"][value="inc"]');
+        if (inc) inc.checked = true;
+        const ex = document.querySelector('input[name="gstmode"][value="ex"]');
+        if (ex) ex.checked = false;
+        const mp = byId('marginPct');
+        if (mp) mp.value = '0';
+        const uq = byId('useAerproInQuote');
+        if (uq) uq.checked = true;
+      } catch(e){}
+
       await loadAllData();
     });
   </script>
