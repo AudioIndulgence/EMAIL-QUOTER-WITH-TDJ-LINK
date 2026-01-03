@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Car Audio Quote Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 10px; }
+    .product, .extra { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin: 12px 0; background: #fafaff; }
+    .flex { display: flex; flex-wrap: wrap; gap: 10px; }
+    .col { flex: 1 1 220px; }
+    label { font-weight: bold; }
+    input[type="text"], input[type="number"], textarea { width: 100%; padding: 4px; margin: 2px 0 8px 0; border-radius: 4px; border: 1px solid #ccc; }
+    .quote-preview { background: #f5edfa; border: 2px solid #9b59b6; border-radius: 12px; padding: 18px; margin: 20px 0; }
+    .btn { background: #9b59b6; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 1.05em; }
+    .btn.secondary { background: #6b7280; }
+    .btn.ghost { background: #f7f7fb; color: #111; border: 1px solid #ddd; }
+    .btn:active { opacity: 0.9; }
+
+    .category-toggle { margin: 0 8px 12px 0; padding: 8px 14px; border-radius: 20px; border: 1px solid #ccc; background: #f7f7fb; cursor: pointer; display: inline-block; font-weight: bold;}
+    .category-toggle.active { background: #9b59b6; color: #fff; border: 2px solid #7c3aed; }
+    .category-bar { margin-bottom: 14px; }
+
+    .img-thumb { max-width: 300px; max-height: 300px; border-radius: 6px; }
+    .extra-thumb { max-width: 180px; max-height: 180px; border-radius: 6px; }
+
+    .showcase-wrap { margin-top: 6px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 8px; background: #fff; display: flex; flex-direction: column; align-items: center; }
+    .card img { width: 100%; height: 100px; object-fit: cover; border-radius: 6px; }
+    .pill { display:inline-block; font-size: 12px; padding: 2px 8px; border: 1px solid #e5e7eb; border-radius: 999px; color:#374151; background:#f9fafb; }
+    .muted { color: #6b7280; font-size: 12px; }
+    .hint { color:#374151; font-size: 12px; }
+
+    .email-showcase { display:flex; flex-wrap:wrap; gap:10px; }
+    .email-showcase img { max-width:48%; border-radius:6px; }
+
+    /* --- Aerpro / TDJ block --- */
+    .ap-hint { color:#666; font-size: 13px; margin: 6px 0 10px; }
+    .ap-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 12px; }
+    .ap-bar .small { font-size:12px; color:#666; }
+    .ap-total { background:#f5edfa; border:2px solid #9b59b6; padding:12px; border-radius:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .ap-total input { font-size: 16px; padding:6px 10px; width: 160px; }
+    .ap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .ap-card { border: 1px solid #e3e5ea; border-radius: 12px; padding: 10px; background: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .ap-thumb { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; border-radius: 10px; max-height: 180px; background:#fff; }
+    .ap-title { font-size: 13px; font-weight: 600; margin: 8px 0 2px; }
+    .ap-sku { font-size: 11px; color: #6b7280; }
+    .ap-price { margin-top: 6px; font-size: 14px; font-weight: bold; color: #111; }
+    .ap-check { margin: 6px 0 0; font-size: 12px; }
+    .ap-vehicle-images { display:flex; flex-wrap:wrap; gap: 10px; align-items:flex-start; margin: 8px 0 0; }
+    .ap-vehicle-images img { width: 210px; max-width:100%; height:auto; object-fit:contain; border-radius:10px; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+    .ap-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+
+    .email-parts-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px; }
+    .email-parts-item { border:1px solid #ddd; border-radius:8px; padding:8px; background:#fff; display:flex; gap:10px; align-items:center; }
+    .email-parts-item img { width:80px; height:80px; object-fit:contain; border-radius:6px; }
+    .email-parts-meta { font-size:12px; color:#374151; }
+    .email-parts-meta b { display:block; margin-bottom:2px; }
+    .ap-diag { background:#fff7ed; border:1px solid #f59e0b; color:#92400e; padding:8px 10px; border-radius:8px; font-size:12px; margin:6px 0 0; white-space:pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Car Audio Email Quote Generator</h2>
+
+  <!-- Category Selector + Product Search -->
+  <div class="category-bar" id="categoryButtons"></div>
+  <div class="flex">
+    <div class="col" style="flex:1 1 100%;">
+      <label>Search Products</label>
+      <input id="productSearch" type="text" placeholder="Search brand, model, description...">
+    </div>
+  </div>
+
+  <!-- Customer Info -->
+  <div class="flex">
+    <div class="col">
+      <label>Customer Name</label>
+      <input id="customerName" type="text" />
+    </div>
+    <div class="col">
+      <label>Vehicle Info</label>
+      <input id="vehicleInfo" type="text" placeholder="e.g. Toyota Hilux 2012" />
+    </div>
+  </div>
+  <div class="flex">
+    <div class="col">
+      <label>Customer Email</label>
+      <input id="customerEmail" type="text" />
+    </div>
+    <div class="col">
+      <label>Reason for Enquiry</label>
+      <input id="inquiryReason" type="text" />
+    </div>
+  </div>
+
+  <!-- OEM Radio -->
+  <div>
+    <label>OEM Radio (manual URL – optional)</label>
+    <input id="oemRadioManual" type="text" placeholder="https://example.com/oem.jpg" />
+    <div class="showcase-wrap">
+      <div class="flex" style="justify-content: space-between; align-items: baseline;">
+        <h3 style="margin:8px 0;">Suggested OEM Radio (Make/Year)</h3>
+        <span id="oemContext" class="muted"></span>
+      </div>
+      <div id="oemSuggested" class="grid"></div>
+      <p class="hint" style="margin-top:6px;">If no year is typed, we’ll ignore year filtering and show best matches by make.</p>
+    </div>
+  </div>
+
+  <!-- Showcase Images -->
+  <div>
+    <label>Manual Showcase Images (comma-separated URLs)</label>
+    <input id="showcaseImages" type="text" placeholder="https://example.com/img1.jpg, https://example.com/img2.jpg" />
+    <div class="showcase-wrap">
+      <div class="flex" style="justify-content: space-between; align-items: baseline;">
+        <h3 style="margin:8px 0;">Suggested Showcase Images</h3>
+        <span id="showcaseContext" class="muted"></span>
+      </div>
+      <div id="showcaseFilters" class="muted" style="margin-bottom:6px; display:none;"></div>
+      <div id="suggestedShowcase" class="grid"></div>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button class="btn secondary" id="clearShowcaseSel" type="button">Clear Selection</button>
+        <button class="btn" id="selectAllShowcase" type="button">Select All</button>
+      </div>
+      <p class="hint" style="margin-top:6px;">Tip: If no year is typed, we’ll ignore the year filter. Rows marked “All” are generic (e.g., Dashcam installs).</p>
+    </div>
+  </div>
+<!-- Vehicle Parts (manual fallback) - removed from UI (TDJ selector used instead) -->
+<input id="vehiclePartsPrice" type="number" value="0" style="display:none;" />
+
+<!-- Key Features Toggle -->
+
+  <div>
+    <label><input id="showKeyFeatures" type="checkbox" checked /> Show Key Features in Quote</label>
+  </div>
+
+  <!-- =================== AERPRO SELECTOR + TDJ PRICING =================== -->
+  <hr />
+  <h3 style="margin-bottom:6px;">Vehicle Selector (Aerpro) & TDJ Pricing</h3>
+  <div id="apStatus" class="hint" style="margin:6px 0;display:none;"></div>
+  <div id="apDiag" class="ap-diag" style="display:none;display:none;"></div>
+  <p class="ap-hint" style="display:none;">Pick the exact vehicle below. We’ll fetch the matching Aerpro parts, price them from your TDJ sheet, and you can choose which parts to include in the quote.</p>
+
+  <div class="ap-bar" style="display:none;">
+    <span class="small">GST handling:</span>
+    <label class="small"><input type="radio" name="gstmode" value="inc" checked> RRP includes GST</label>
+    <label class="small"><input type="radio" name="gstmode" value="ex"> RRP excludes GST (add 10%)</label>
+    <label class="small">Margin %: <input type="number" id="marginPct" value="0" min="0" step="1" style="width:70px;"></label>
+    <label class="small"><input type="checkbox" id="useAerproInQuote" checked> Use these parts in the quote</label>
+  </div>
+
+  <!-- Aerpro selector widget -->
+  <div id="aerpro-selector-here" style="margin:8px 0 12px; min-height:50px;"></div>
+
+  <!-- Selected vehicle images -->
+  <div id="apVehicleBlock"></div>
+
+  <!-- Aerpro matched products -->
+  <div class="flex" style="justify-content: space-between; align-items:center; margin:10px 0;">
+    <h4 style="margin:0;">Matched Conversion Parts (priced)</h4>
+    <div class="ap-actions">
+      <input id="apFilter" type="text" placeholder="Filter by SKU/Title..." style="padding:6px 10px; border-radius:8px; border:1px solid #ddd; width:200px;">
+      <button class="btn ghost" id="apSelectAllBtn" type="button">Select all</button>
+      <button class="btn ghost" id="apSelectNoneBtn" type="button">Select none</button>
+    </div>
+  </div>
+  <div id="apResults" class="ap-grid"></div>
+
+  <!-- Total + actions -->
+  <div class="ap-total" id="apTotalBar" style="display:none;">
+    <b>Vehicle Parts Total:</b>
+    <input id="apPartsTotal" type="number" step="0.01" min="0" value="0">
+    <button class="btn" id="apCopySummaryBtn" type="button">Copy parts summary</button>
+    <button class="btn" id="apUseInQuoteBtn" type="button">Use in Quote (fill price & images)</button>
+  </div>
+  <!-- ================================================================ -->
+
+  <hr />
+  <h3>Select Products</h3>
+  <div id="productsList"></div>
+
+  <hr />
+  <h3>Select Optional Extras</h3>
+  <div id="extrasList"></div>
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;">
+    <button class="btn" id="generateBtn">Generate Quote</button>
+    <button class="btn" id="copyBtn">Copy Text Only</button>
+        <button class="btn" id="copyItemsHtmlBtn">📋 Copy Items Only</button>
+<button class="btn" id="copyHtmlBtn">📋 Copy Quote with Images</button>
+  </div>
+
+  <div id="quotePreview" class="quote-preview"></div>
+
+  <!-- We’ll insert jQuery + plugin dynamically if missing -->
+  <script>
+    // ---- CONFIG ----
+    const API_KEY  = 'AIzaSyAsyikniyB7AyZxf9vkR9HryJvLhW9ui3c'; // <- your key
+    const SHEET_ID = '1-EyjLxIhq_AvO0aPcStgNswzw05xc_PMfAN2f6-K3MA'; // <- your sheet
+    const PRODUCTS_TAB = 'Sheet1';
+    const EXTRAS_TAB   = 'Extras';
+    const VEHICLE_PARTS_TAB = 'Vehicle Parts';
+    const SHOWCASE_TAB = 'Showcase';
+    const OPENINGS_TAB = 'Openings';
+    const OEM_TAB      = 'OEM';
+
+    // TDJ price source (A=SKU, C=RRP)
+    const PRICE_TAB   = 'TDJ Pricelist';
+    const PRICE_RANGE = 'A:C';
+
+    // -------- helpers --------
+    const byId = (id) => document.getElementById(id);
+    const money = (n) => '$' + n.toFixed(2);
+    const parsePrice = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+    const titleCaseFirst = (s) => (s||'').charAt(0).toUpperCase() + (s||'').slice(1).toLowerCase();
+    const normSku = (s) => (s||'').toString().toUpperCase().replace(/[^A-Z0-9]/g,'');
+
+    function apMsg(t, ok=true){
+      const el = byId('apStatus'); if (!el) return;
+      el.textContent = t || '';
+      el.style.color = ok ? '#374151' : '#b00020';
+    }
+    function apDiag(t){
+      const box = byId('apDiag'); if (!box) return;
+      if(!t){ box.style.display='none'; box.textContent=''; return; }
+      box.style.display='block'; box.textContent = t;
+    }
+
+    // === Safe loader for jQuery + Aerpro plugin ===
+    function loadScript(url){
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = url; s.async = true; s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    async function ensureAerproReady(){
+      apMsg('Preparing vehicle selector…');
+      // 1) jQuery (use 1.11.3 which the widget expects)
+      if (!window.jQuery) {
+        try {
+          await loadScript('https://code.jquery.com/jquery-1.11.3.min.js');
+          apDiag('jQuery loaded (1.11.3).');
+        } catch(e){
+          apMsg('Failed to load jQuery.', false);
+          apDiag(String(e));
+          return false;
+        }
+      }
+
+      // 2) Plugin from primary host
+      function havePlugin(){ return !!(window.jQuery && jQuery.fn && jQuery.fn.aerproVehicleSelector); }
+      if (!havePlugin()){
+        try {
+          await loadScript('https://aerpro.com/plugin.js');
+          apDiag('Loaded Aerpro plugin from aerpro.com.');
+        } catch(e1){
+          apDiag('Primary host failed, trying www.aerpro.com…\n' + String(e1));
+        }
+      }
+      // 3) Try alternate host
+      if (!havePlugin()){
+        try {
+          await loadScript('https://www.aerpro.com/plugin.js');
+          apDiag('Loaded Aerpro plugin from www.aerpro.com.');
+        } catch(e2){
+          apMsg('Could not load Aerpro selector plugin.', false);
+          apDiag('Tried both hosts.\n• If you use an ad/content blocker, allow aerpro.com.\n• Ensure page served over HTTPS.\n• Try hard refresh (Ctrl/Cmd+Shift+R).');
+          return false;
+        }
+      }
+      if (!havePlugin()){
+        apMsg('Aerpro plugin present check failed.', false);
+        return false;
+      }
+      apMsg('Vehicle selector ready.');
+      return true;
+    }
+
+    // ========= Data from tabs =========
+    let products = [], extras = [], vehiclePartsList = [], showcaseRows = [], categoryOpenings = {};
+    let oemRows = [];
+    let allCategories = [], selectedCategories = [];
+    let suggestedNow = [];
+    let selectedShowcaseUrls = new Set();
+    let selectedOEMUrl = '';
+
+    // ========= Aerpro / TDJ state =========
+    let priceBySku = {};     // { SKU -> RRP }
+    let apLastData = null;
+    let apSelectedSkus = new Set();   // starts empty (unchecked by default)
+    let apItems = [];
+    let apVehicleLabel = '';
+    let apVehicleImages = [];
+    let apFilterText = '';
+
+    // ========= vehicle text parsing =========
+    function extractMakeYear(vehicleInfo){
+      const info = (vehicleInfo||'').trim();
+      let make = ''; let year = null;
+      if(!info) return { make, year };
+      const tokens = info.split(/\s+/);
+      if(tokens.length) make = tokens[0];
+      const yMatch = info.match(/(19|20)\d{2}/);
+      if(yMatch) year = parseInt(yMatch[0], 10);
+      return { make: titleCaseFirst(make), year };
+    }
+    function yearMatches(rangeStr, year){
+      if(year == null) return true;
+      if(!rangeStr || rangeStr.toLowerCase()==='all') return true;
+      const s = rangeStr.trim();
+      if(/^(19|20)\d{2}-(19|20)\d{2}$/.test(s)){ const [a,b] = s.split('-').map(x=>parseInt(x,10)); return year>=a && year<=b; }
+      if(/^\d{4}\+$/.test(s)){ const a = parseInt(s,10); return year>=a; }
+      if(/^Up to \d{4}$/i.test(s)){ const a = parseInt(s.match(/\d{4}/)[0],10); return year<=a; }
+      if(/^\d{4}$/.test(s)){ const a = parseInt(s,10); return year===a; }
+      return true;
+    }
+    function makeMatches(rowMake, vehicleInfo){
+      if(!rowMake || rowMake.toLowerCase()==='all') return true;
+      const hay = (vehicleInfo || '').toLowerCase();
+      const needle = rowMake.trim().toLowerCase();
+      return hay.includes(needle);
+    }
+    function categoryMatches(rowCat, selectedCats){
+      if(!rowCat || rowCat.toLowerCase()==='all') return true;
+      if(!selectedCats || !selectedCats.length) return true;
+      return selectedCats.map(c=>c.toLowerCase()).includes(rowCat.toLowerCase());
+    }
+
+    // ===================== Load everything ======================
+    async function fetchSheet(tab) {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      return data.values || [];
+    }
+
+    async function loadAllData(){
+      const [prodRows, extrasRows, vehiclePartsRows, showcaseVals, openingsVals, oemVals] = await Promise.all([
+        fetchSheet(PRODUCTS_TAB),
+        fetchSheet(EXTRAS_TAB),
+        fetchSheet(VEHICLE_PARTS_TAB),
+        fetchSheet(SHOWCASE_TAB),
+        fetchSheet(OPENINGS_TAB),
+        fetchSheet(OEM_TAB)
+      ]);
+
+      products = (prodRows||[]).slice(7)
+        .filter(row => row[1] && row[2] && (row[4] || row[5]))
+        .map((row, idx) => ({
+          id: 'prod_' + idx,
+          checked: false,
+          brand: row[1] || '',
+          model: row[2] || '',
+          desc: row[3] || '',
+          price: parsePrice(row[4]),
+          category: row[5] || '',
+          parts: row[6] || '',
+          partsPrice: parsePrice(row[7]),
+          install: parsePrice(row[8]),
+          keyFeat: row[9] || '',
+          imgUrl: row[10] || ''
+        }));
+
+      extras = (extrasRows||[]).slice(1).map((row, idx) => ({
+        id: 'ex_' + idx,
+        checked: false,
+        name: row[0] || '',
+        price: parsePrice(row[1]),
+        imgUrl: row[2] || '',
+        category: row[3] || ''
+      }));
+
+      vehiclePartsList = (vehiclePartsRows||[]).slice(1).map(row => row[0]).filter(Boolean);
+
+      showcaseRows = (showcaseVals||[]).slice(1).map((r, idx) => ({
+        id: 'sc_' + idx,
+        make: (r[0]||'').trim(),
+        yearRange: (r[1]||'').trim(),
+        category: (r[2]||'').trim(),
+        url: (r[3]||'').trim(),
+        label: (r[4]||'').trim()
+      })).filter(r => r.url);
+
+      categoryOpenings = {};
+      (openingsVals||[]).slice(1).forEach(row => {
+        if(row[0] && row[1]) categoryOpenings[row[0].toLowerCase()] = row[1];
+      });
+
+      oemRows = (oemVals||[]).slice(1).map((r, idx) => ({
+        id: 'oem_' + idx,
+        make: (r[0]||'').trim(),
+        yearRange: (r[1]||'').trim(),
+        url: (r[2]||'').trim(),
+        label: (r[3]||'').trim()
+      })).filter(r => r.url);
+
+      allCategories = Array.from(new Set(products.map(p => p.category))).filter(Boolean);
+      selectedCategories = [];
+
+      renderCategoryButtons();
+      renderProductList();
+      renderExtrasList();
+      renderVehiclePartsOptions();
+      refreshShowcaseSuggestions();
+      refreshOemSuggestions();
+
+      // TDJ prices + Aerpro widget
+      await fetchTDJPrices();
+
+      const ok = await ensureAerproReady();
+      if (ok) {
+        try {
+          window.jQuery('#aerpro-selector-here').aerproVehicleSelector(function(data){
+            apDiag('aerproVehicleSelector() callback fired.');
+            apLastData = data || null;
+            apSelectedSkus = new Set();   // reset selection each vehicle pick
+            renderApVehicle(data?.vehicle);
+            renderApProducts();
+          });
+          apMsg('Vehicle selector loaded. Pick your vehicle below.');
+        } catch (e) {
+          apMsg('Aerpro selector initialisation threw an error.', false);
+          apDiag(String(e));
+        }
+      }
+    }
+
+    // ===================== Category toggle UI ======================
+    function renderCategoryButtons(){
+      const bar = byId('categoryButtons');
+      bar.innerHTML = '';
+      allCategories.forEach(cat => {
+        const active = selectedCategories.includes(cat) ? 'active' : '';
+        bar.innerHTML += `<span class="category-toggle ${active}" onclick="toggleCategory('${cat.replace(/'/g,"\\'")}')">${cat}</span>`;
+      });
+    }
+    window.toggleCategory = function(cat){
+      if(selectedCategories.includes(cat)) selectedCategories = selectedCategories.filter(c=>c!==cat);
+      else selectedCategories.push(cat);
+      renderCategoryButtons();
+      renderProductList();
+      renderExtrasList();
+      refreshShowcaseSuggestions();
+    }
+
+    // ===================== Products & Extras ======================
+    function productMatchesSearch(p, q){
+      if(!q) return true;
+      const hay = `${p.brand} ${p.model} ${p.desc}`.toLowerCase();
+      return hay.includes(q.toLowerCase());
+    }
+
+    function renderProductList(){
+      const div = byId('productsList');
+      const query = byId('productSearch').value.trim();
+      div.innerHTML = '';
+      let filtered = selectedCategories.length ? products.filter(p => selectedCategories.includes(p.category)) : [];
+      if(!selectedCategories.length){
+        div.innerHTML = `<div style="border:2px dashed #ccc;border-radius:8px;padding:20px;text-align:center;color:#666;background:#f9f9fb;font-size:1.1em;">📂 No Products Displayed<br><span style="font-size:0.9em;">👉 Select a category above to view products.</span></div>`;
+        return;
+      }
+      filtered = filtered.filter(p => productMatchesSearch(p, query));
+      if(!filtered.length){ div.innerHTML = '<div style="color:#666;">(No products match your filters.)</div>'; return; }
+      filtered.forEach(p => {
+        div.innerHTML += `
+        <div class="product flex" data-id="${p.id}">
+          <input type="checkbox" onchange="toggleProductById('${p.id}')" ${p.checked?'checked':''} />
+          <div class="col" style="min-width:90px;">${p.imgUrl?`<img src="${p.imgUrl}" class="img-thumb" />`:''}</div>
+          <div class="col" style="flex:2;">
+            <b>${p.brand} ${p.model}</b><br />
+            <i>${p.desc}</i>
+            <div><label>Price:</label><input type="number" min="0" step="0.01" value="${p.price}" onchange="editProductPriceById('${p.id}', this.value)" /></div>
+            <div><label>Install Price:</label><input type="number" min="0" step="0.01" value="${p.install}" onchange="editProductInstallById('${p.id}', this.value)" /></div>
+            <div><label>Category:</label><span>${p.category}</span></div>
+            <div><label>Parts Price:</label><input type="number" min="0" step="0.01" value="${p.partsPrice}" onchange="editProductPartsPriceById('${p.id}', this.value)" /></div>
+            <div><label>Key Features:</label><textarea onchange="editProductKeyFeatById('${p.id}', this.value)">${p.keyFeat}</textarea></div>
+          </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>`;
+      });
+    }
+    byId('productSearch').addEventListener('input', renderProductList);
+    window.toggleProductById = id => { const p=products.find(x=>x.id===id); if(p){ p.checked=!p.checked; renderExtrasList(); refreshShowcaseSuggestions(); } }
+    window.editProductPriceById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.price=parsePrice(v);}
+    window.editProductInstallById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.install=parsePrice(v);}
+    window.editProductPartsPriceById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.partsPrice=parsePrice(v);}
+    window.editProductKeyFeatById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.keyFeat=v;}
+
+    function renderExtrasList(){
+      const div = byId('extrasList');
+      div.innerHTML = '';
+      const selCats = products.filter(p=>p.checked).map(p=>p.category.toLowerCase());
+      if(!selCats.length){ div.innerHTML = '<div style="color:#666;">(Select a product to see extras.)</div>'; return; }
+      const filtered = extras.filter(ex=>ex.category && selCats.includes(ex.category.toLowerCase()));
+      if(!filtered.length){ div.innerHTML = '<div style="color:#666;">No optional extras available.</div>'; return; }
+      filtered.forEach(ex=>{
+        div.innerHTML += `<div class="extra flex" data-id="${ex.id}">
+          <input type="checkbox" onchange="toggleExtraById('${ex.id}')" ${ex.checked?'checked':''}/>
+          <div class="col" style="min-width:90px;">${ex.imgUrl?`<img src="${ex.imgUrl}" class="extra-thumb"/>`:''}</div>
+          <div class="col" style="flex:2;">
+            <b>${ex.name}</b>
+            <div><label>Extra Price:</label><input type="number" min="0" step="0.01" value="${ex.price}" onchange="editExtraPriceById('${ex.id}', this.value)"/></div>
+          </div>
+        </div>`;
+      });
+    }
+    window.toggleExtraById=id=>{const e=extras.find(x=>x.id===id); if(e) e.checked=!e.checked;}
+    window.editExtraPriceById=(id,v)=>{const e=extras.find(x=>x.id===id); if(e) e.price=parsePrice(v);}
+
+    // ===================== Showcase & OEM suggestions ======================
+    function getSelectedProductCategories(){ return products.filter(p => p.checked).map(p => p.category); }
+
+    function refreshShowcaseSuggestions(){
+      const vehicleStr = byId('vehicleInfo').value;
+      const { make, year } = extractMakeYear(vehicleStr);
+      const context = [];
+      if(make) context.push(make);
+      if(year) context.push(String(year));
+      byId('showcaseContext').textContent = context.length ? `Matched for: ${context.join(' · ')}` : '';
+
+      const selectedCats = getSelectedProductCategories();
+      const hasCatFilter = selectedCats.length > 0;
+      byId('showcaseFilters').style.display = hasCatFilter ? 'block' : 'none';
+      if(hasCatFilter){ byId('showcaseFilters').textContent = `Filtering by product categories: ${selectedCats.join(', ')}`; }
+
+      suggestedNow = showcaseRows.filter(r =>
+        makeMatches(r.make, vehicleStr) && yearMatches(r.yearRange, year) && categoryMatches(r.category, selectedCats)
+      );
+      if(!suggestedNow.length){
+        suggestedNow = showcaseRows.filter(r => makeMatches(r.make, vehicleStr) && yearMatches(r.yearRange, year));
+      }
+      if(!suggestedNow.length){
+        suggestedNow = showcaseRows.filter(r => (r.make||'').toLowerCase()==='all');
+      }
+      renderSuggestedShowcase();
+    }
+
+    function renderSuggestedShowcase(){
+      const wrap = byId('suggestedShowcase');
+      wrap.innerHTML = '';
+      if(!suggestedNow.length){
+        wrap.innerHTML = '<div class="muted">No suggestions found. Add manual URLs above.</div>';
+        return;
+      }
+      suggestedNow.forEach(row => {
+        const checked = selectedShowcaseUrls.has(row.url) ? 'checked' : '';
+        wrap.innerHTML += `
+          <div class="card">
+            <img src="${row.url}" alt="Showcase" />
+            <div style="margin-top:6px; text-align:center;">
+              ${row.label ? `<div class="muted">${row.label}</div>` : ''}
+              <div class="muted">${row.make || 'All'} • ${(row.yearRange||'All')}</div>
+              ${row.category ? `<div class="pill" style="margin-top:4px;">${row.category}</div>` : ''}
+            </div>
+            <label style="margin-top:6px; font-size:13px;">
+              <input type="checkbox" class="showcaseCheckbox" data-url="${row.url}" ${checked} /> Include
+            </label>
+          </div>`;
+      });
+      Array.from(document.querySelectorAll('.showcaseCheckbox')).forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const url = e.target.getAttribute('data-url');
+          if(e.target.checked){ selectedShowcaseUrls.add(url); } else { selectedShowcaseUrls.delete(url); }
+        });
+      });
+    }
+
+    function refreshOemSuggestions(){
+      const vehicleStr = byId('vehicleInfo').value;
+      const { year } = extractMakeYear(vehicleStr);
+      const candidates = oemRows.filter(r => makeMatches(r.make, vehicleStr) && yearMatches(r.yearRange, year));
+      const list = candidates.length ? candidates : oemRows.filter(r => (r.make||'').toLowerCase()==='all');
+      renderOem(list);
+
+      const ctxBits = [];
+      if (vehicleStr) ctxBits.push(vehicleStr);
+      if (year) ctxBits.push(String(year));
+      byId('oemContext').textContent = ctxBits.length ? `Matched for: ${ctxBits.join(' · ')}` : '';
+    }
+
+    // ===================== Vehicle-Specific Parts (legacy UI removed) =====================
+    // Older versions of the quoter had a manual vehicle-parts list + price field.
+    // We now use the Aerpro/TDJ selector instead, but some code paths still call this.
+    // Keep as a harmless no-op so Aerpro/TDJ initialisation continues normally.
+    function renderVehiclePartsOptions(){
+      // Intentionally blank
+    }
+
+    function renderOem(list){
+      const wrap = byId('oemSuggested');
+      wrap.innerHTML = '';
+      if(!list.length){
+        wrap.innerHTML = '<div class="muted">No OEM suggestions found. Paste a manual URL above if you like.</div>';
+        return;
+      }
+      list.forEach(row => {
+        const checked = (selectedOEMUrl === row.url) ? 'checked' : '';
+        wrap.innerHTML += `
+          <div class="card">
+            <img src="${row.url}" alt="OEM Radio" />
+            <div style="margin-top:6px; text-align:center;">
+              ${row.label ? `<div class="muted">${row.label}</div>` : ''}
+              <div class="muted">${row.make || 'All'} • ${row.yearRange || 'All'}</div>
+            </div>
+            <label style="margin-top:6px; font-size:13px;">
+              <input type="radio" name="oemPick" data-url="${row.url}" ${checked}/> Use this OEM image
+            </label>
+          </div>`;
+      });
+      Array.from(document.querySelectorAll('input[name="oemPick"]')).forEach(rb=>{
+        rb.addEventListener('change', e => {
+          selectedOEMUrl = e.target.getAttribute('data-url') || '';
+        });
+      });
+    }
+
+    byId('vehicleInfo').addEventListener('input', () => {
+      refreshShowcaseSuggestions();
+      refreshOemSuggestions();
+    });
+    byId('clearShowcaseSel').addEventListener('click', () => { selectedShowcaseUrls.clear(); renderSuggestedShowcase(); });
+    byId('selectAllShowcase').addEventListener('click', () => { suggestedNow.forEach(r => selectedShowcaseUrls.add(r.url)); renderSuggestedShowcase(); });
+
+    // ===================== Aerpro + TDJ integration ======================
+    function getImageUrl(p) {
+      if (p.photo) return p.photo;
+      if (p.image && typeof p.image === 'string') return p.image;
+      if (Array.isArray(p.images)) { const hit = p.images.find(i => i && (i.src || i.url)); if (hit) return hit.src || hit.url; }
+      if (Array.isArray(p.media))  { const hit = p.media.find(m => m && (m.src || m.url)); if (hit) return hit.src || hit.url; }
+      return '';
+    }
+
+    async function fetchTDJPrices(){
+      try{
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(PRICE_TAB + '!' + PRICE_RANGE)}?valueRenderOption=UNFORMATTED_VALUE&key=${API_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          apMsg(`TDJ fetch failed (${res.status}). Check API key & Sheet sharing.`, false);
+          return;
+        }
+        const json = await res.json();
+        const rows = json.values || [];
+        const map = {};
+        for (let i = 1; i < rows.length; i++) {
+          const sku = normSku(rows[i][0]);
+          const rrp = parseFloat(rows[i][2]);
+          if (sku && !isNaN(rrp)) map[sku] = rrp;
+        }
+        priceBySku = map;
+        apMsg('TDJ price rows loaded: ' + Object.keys(priceBySku).length);
+      } catch (e){
+        apMsg('TDJ price load error.', false);
+        apDiag(String(e));
+      }
+    }
+
+    function withGSTandMargin(base) {
+      const gstMode = document.querySelector('input[name="gstmode"]:checked')?.value || 'inc';
+      const marginPct = parseFloat(byId('marginPct').value || '0');
+      let p = base;
+      if (gstMode === 'ex') p *= 1.10;
+      if (!isNaN(marginPct) && marginPct > 0) p *= (1 + marginPct/100);
+      return p;
+    }
+
+    function renderApVehicle(vehicle) {
+      const holder = byId('apVehicleBlock');
+      holder.innerHTML = '';
+      if (!vehicle) return;
+
+      const parts = [(vehicle.make||'').trim(), (vehicle.model||'').trim(), (vehicle.submodel||'').trim()].filter(Boolean).join(' ');
+      apVehicleLabel = parts + (vehicle.year ? ` (${vehicle.year})` : '');
+      const imgs = [];
+      if (vehicle.picture) imgs.push(vehicle.picture);
+      if (vehicle.dash) imgs.push(vehicle.dash);
+      if (vehicle.full_dash) imgs.push(vehicle.full_dash);
+      if (Array.isArray(vehicle.line_drawing)) vehicle.line_drawing.forEach(ld=>ld?.image && imgs.push(ld.image));
+      if (Array.isArray(vehicle.photo)) vehicle.photo.forEach(ph=>ph?.image && imgs.push(ph.image));
+
+      apVehicleImages = imgs;
+
+      const sec = document.createElement('section');
+      sec.innerHTML = `<h4 style="margin:0 0 6px;">${apVehicleLabel}</h4>`;
+      const wrap = document.createElement('div'); wrap.className = 'ap-vehicle-images';
+      imgs.forEach(u => { const img=document.createElement('img'); img.loading='lazy'; img.src=u; wrap.appendChild(img); });
+      sec.appendChild(wrap);
+      holder.appendChild(sec);
+    }
+
+    let apItemsRenderedOnce = false;
+    function renderApProducts(){
+      const grid = byId('apResults');
+      grid.innerHTML = '';
+      byId('apTotalBar').style.display = 'none';
+      byId('apPartsTotal').value = 0;
+
+      if (!apLastData || !apLastData.vehicle) return;
+      const allProducts = Array.isArray(apLastData.vehicle.products) ? apLastData.vehicle.products : [];
+
+      apItems = [];
+      allProducts.forEach(p => {
+        const sku = normSku(p.sku);
+        if (!sku || priceBySku[sku] == null) return;
+        const base = priceBySku[sku];
+        const item = {
+          sku,
+          title: p.title || sku,
+          baseRRP: base,
+          adjPrice: withGSTandMargin(base),
+          img: getImageUrl(p),
+          url: p.url || ''
+        };
+        if (apFilterText){
+          const hay = `${item.sku} ${item.title}`.toLowerCase();
+          if (!hay.includes(apFilterText.toLowerCase())) return;
+        }
+        apItems.push(item);
+      });
+
+      if (!apItems.length){
+        grid.innerHTML = '<div class="muted">(No items from this vehicle match your TDJ sheet or filter.)</div>';
+        apMsg('No Aerpro SKUs matched your TDJ sheet (check Column A SKUs).', false);
+        return;
+      } else {
+        apMsg('Matched ' + apItems.length + ' Aerpro item(s) to TDJ.');
+      }
+
+      apItems.forEach(i => {
+        const checked = apSelectedSkus.has(i.sku) ? 'checked' : '';
+        const card = document.createElement('div'); card.className = 'ap-card';
+        card.innerHTML = `
+          <img class="ap-thumb" loading="lazy" src="${i.img}" alt="${i.title}">
+          <div class="ap-title">${i.title}</div>
+          <div class="ap-sku">SKU: ${i.sku}</div>
+          <div class="ap-price">${money(i.adjPrice)}</div>
+          <label class="ap-check"><input type="checkbox" data-sku="${i.sku}" ${checked}> Include</label>
+        `;
+        if (i.url) { card.style.cursor='pointer'; card.addEventListener('click', (e)=>{ if(e.target.tagName.toLowerCase()!=='input') window.open(i.url,'_blank'); }); }
+        grid.appendChild(card);
+      });
+
+      grid.querySelectorAll('input[type="checkbox"][data-sku]').forEach(cb=>{
+        cb.addEventListener('change', e=>{
+          const sku = e.target.getAttribute('data-sku');
+          if (e.target.checked) apSelectedSkus.add(sku); else apSelectedSkus.delete(sku);
+          apRecalcTotal();
+        });
+      });
+
+      byId('apTotalBar').style.display = 'flex';
+      apRecalcTotal();
+
+      if (!apItemsRenderedOnce) {
+        apItemsRenderedOnce = true;
+        apDiag('Rendered ' + apItems.length + ' matched items.');
+      }
+    }
+
+    function apRecalcTotal(){
+      const total = apItems.filter(i => apSelectedSkus.has(i.sku)).reduce((t,i)=>t+i.adjPrice, 0);
+      byId('apPartsTotal').value = total.toFixed(2);
+    }
+
+    function initAerproControls(){
+      byId('apCopySummaryBtn').addEventListener('click', () => {
+        const total = parseFloat(byId('apPartsTotal').value || '0');
+        const chosen = apItems.filter(i => apSelectedSkus.has(i.sku));
+        const lines = chosen.map(i => `${i.sku} — ${i.title} — ${money(i.adjPrice)}`).join('\n');
+        const text = `Vehicle-Specific Parts (Aerpro/TDJ)
+Vehicle: ${apVehicleLabel}
+${lines}
+Total: ${money(total)}`;
+        navigator.clipboard.writeText(text).then(()=>alert('Parts summary copied!'));
+      });
+      byId('apUseInQuoteBtn').addEventListener('click', () => {
+        const total = parseFloat(byId('apPartsTotal').value || '0');
+        byId('vehiclePartsPrice').value = total.toFixed(2);
+        byId('useAerproInQuote').checked = true;
+        alert('Parts total filled and Aerpro parts will be used in the quote.');
+      });
+
+      byId('apSelectAllBtn').addEventListener('click', () => {
+        apItems.forEach(i => apSelectedSkus.add(i.sku));
+        apRecalcTotal(); renderApProducts();
+      });
+      byId('apSelectNoneBtn').addEventListener('click', () => {
+        apSelectedSkus = new Set();
+        apRecalcTotal(); renderApProducts();
+      });
+      byId('apFilter').addEventListener('input', (e) => {
+        apFilterText = e.target.value.trim();
+        renderApProducts();
+      });
+
+      document.querySelectorAll('input[name="gstmode"]').forEach(r =>
+        r.addEventListener('change', () => { apItems.forEach(i=>i.adjPrice = withGSTandMargin(i.baseRRP)); renderApProducts(); })
+      );
+      byId('marginPct').addEventListener('input', () => { apItems.forEach(i=>i.adjPrice = withGSTandMargin(i.baseRRP)); apRecalcTotal(); renderApProducts(); });
+    }
+
+        // Stores a paste-ready HTML fragment containing only parts + products (no intro/outro/service/showcase)
+    let lastItemsOnlyHtml = '';
+
+// ===================== QUOTE BUILD ======================
+    byId('generateBtn').addEventListener('click', generateQuote);
+    byId('copyBtn').addEventListener('click', copyQuoteTextOnly);
+    byId('copyHtmlBtn').addEventListener('click', copyQuoteHtml);
+    byId('copyItemsHtmlBtn').addEventListener('click', copyItemsOnlyHtml);
+    byId('apFilter')?.addEventListener('input', ()=>{});
+
+    function generateQuote(){
+      const customerName = byId('customerName').value || 'Customer';
+      const vehicleInfo = byId('vehicleInfo').value || '';
+      const customerEmail = byId('customerEmail').value || '';
+      const inquiryReason = byId('inquiryReason').value || '';
+      const manualShowcase = byId('showcaseImages').value;
+      const vehiclePartsPrice = parsePrice(byId('vehiclePartsPrice').value);
+      const showKeyFeatures = byId('showKeyFeatures').checked;
+      const useAerpro = byId('useAerproInQuote').checked;
+
+      const oemManual = byId('oemRadioManual').value.trim();
+      const oemUrl = selectedOEMUrl || oemManual;
+
+      const checkedParts = Array.from(document.querySelectorAll('.vehiclePartCheckbox:checked')).map(cb => cb.value);
+      const manualVehiclePartsList = checkedParts.join(', ');
+
+      const selected = products.filter(p => p.checked);
+      if(!selected.length){ alert('No products selected.'); return; }
+
+      let apSelectedItems = [];
+      let apPartsTotalUsed = 0;
+      let apSKUsUsed = [];
+      if (useAerpro && apItems.length){
+        apSelectedItems = apItems.filter(i => apSelectedSkus.has(i.sku));
+        apPartsTotalUsed = parseFloat(byId('apPartsTotal').value || '0');
+        apSKUsUsed = apSelectedItems.map(i => i.sku);
+      }
+
+      let productHtml = '';
+      selected.forEach(item => {
+        let usePartsName = item.parts;
+        let usePartsPrice = item.partsPrice;
+
+        if(item.category.toLowerCase() === 'indash av'){
+          if(useAerpro && apSelectedItems.length){
+            usePartsName = apSKUsUsed.join(', ');
+            usePartsPrice = apPartsTotalUsed;
+          } else if (vehiclePartsPrice > 0) {
+            usePartsName = manualVehiclePartsList;
+            usePartsPrice = vehiclePartsPrice;
+          }
+        }
+
+        const itemExtras = extras.filter(e => e.checked && e.category && e.category.toLowerCase() === item.category.toLowerCase());
+        const itemExtrasTotal = itemExtras.reduce((t,e)=>t+e.price,0);
+        const totalInstalled = (item.price||0) + (item.install||0) + (usePartsPrice||0) + itemExtrasTotal;
+
+        productHtml += `
+        <div style="font-family:Arial,sans-serif;max-width:640px;padding:10px;border:1px solid #ddd;margin-bottom:20px;">
+          <h2>📦 <span style="color:#0066cc;">${item.brand} ${item.model}</span></h2>
+          ${item.imgUrl ? `<img src="${item.imgUrl}" alt="${(item.brand||'') + ' ' + (item.model||'')}" style="width:100%;max-width:360px;height:auto;display:block;margin:10px auto 12px auto;border-radius:8px;" />` : ''}
+          <p><strong>🔍 Description:</strong> ${item.desc}</p>
+          ${showKeyFeatures && item.keyFeat ? `<p><strong>🌟 Key Features:</strong><br />${item.keyFeat}</p>` : ''}
+          ${item.category.toLowerCase() === 'indash av' ? `
+            <p>🔧 <strong>Included Installation Parts:</strong></p>
+            ${usePartsName ? `<ul style="margin-top:0;margin-bottom:10px;padding-left:20px;">${usePartsName.split(',').map(part => `<li>${part.trim()}</li>`).join('')}</ul>` : ''}` : ''}
+          ${itemExtras.length ? `
+            <div style="margin-top:10px;">
+              <p><strong>🛠 Optional Extras:</strong></p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;padding:10px 0;">
+                ${itemExtras.map(ex => `
+                  <div style="flex:1 1 calc(50% - 10px);box-sizing:border-box;text-align:center;align-items:flex-start;display:flex;flex-direction:column;justify-content:flex-start;padding:10px;border:1px solid #ccc;border-radius:8px;background-color:#f9f9f9;height:180px;">
+                    ${ex.imgUrl ? `<div style="height:80px;width:100%;display:flex;align-items:center;justify-content:center;margin-bottom:5px;">
+                      <img src="${ex.imgUrl}" style="max-height:90px;max-width:90px;object-fit:contain;border-radius:4px;">
+                    </div>` : ''}
+                    <p style="margin:5px 0;font-weight:bold;">${ex.name}</p>
+                  </div>`).join('')}
+              </div>
+            </div>` : ''}
+          <div style="margin-top:10px;padding:10px;border:2px solid #9b59b6;border-radius:8px;background-color:#f5edfa;text-align:center;font-size:18px;font-weight:bold;">✅ Complete Installed Package: $${totalInstalled.toFixed(2)}</div>
+        </div>`;
+      });
+
+      const manualUrls = (manualShowcase||'').split(',').map(u => u.trim()).filter(Boolean);
+      const selectedUrls = Array.from(selectedShowcaseUrls.values());
+      const finalShowcase = [...new Set([...selectedUrls, ...manualUrls])];
+
+      let showcaseHtml = '';
+      if(finalShowcase.length){
+        showcaseHtml = `
+          <div style="margin:30px 0;">
+            <p style="font-weight:bold;">📸 Some examples of completed jobs:</p>
+            <div class="email-showcase">
+              ${finalShowcase.map(url => `<img src="${url}" />`).join('')}
+            </div>
+          </div>`;
+      }
+
+      const firstCat = selected[0]?.category?.toLowerCase() || '';
+let opening = '';
+
+if (firstCat && categoryOpenings[firstCat]) {
+  // Always include the personalised line first
+  opening = `
+    <p>Hi ${customerName}, thanks for reaching out about ${inquiryReason} for your ${vehicleInfo}.</p>
+    <p>${categoryOpenings[firstCat]}</p>
+  `;
+} else {
+  // Fallback if no category-specific opening exists
+  opening = `
+    <p>Hi ${customerName}, thanks for reaching out about ${inquiryReason} for your ${vehicleInfo}. 
+    Please find below quality product options and pricing totals which include conversion parts and labour for your consideration.</p>
+  `;
+}
+
+
+      const oemHtml = (selectedOEMUrl || byId('oemRadioManual').value.trim()) ? `
+        <div style="margin:16px 0 24px 0; padding:12px; border:1px solid #ddd; border-radius:8px; background:#fff;">
+          <p style="margin:0 0 8px 0; font-weight:bold;">Before: OEM radio (to confirm the dash)</p>
+          <img src="${selectedOEMUrl || byId('oemRadioManual').value.trim()}" style="max-width:300px; width:100%; border-radius:6px;" alt="OEM radio">
+        </div>` : '';
+
+      let aerproEmailBlock = '';
+      if (byId('useAerproInQuote').checked && apItems.length){
+        const chosen = apItems.filter(i => apSelectedSkus.has(i.sku));
+        if (chosen.length){
+
+          // Email-safe 2-column table layout (best compatibility with iOS Mail paste):
+          // - Always renders 2 items per row on desktop and mobile
+          // - Uses only tables + inline styles (no grid/flex/classes)
+          let rowsHtml = '';
+          for (let idx = 0; idx < chosen.length; idx += 2) {
+            const a = chosen[idx];
+            const b = chosen[idx + 1];
+
+            const cell = (i) => {
+              if (!i) return `<td width="50%" style="padding:6px; vertical-align:top;"></td>`;
+              return `
+                <td width="50%" style="padding:6px; vertical-align:top;">
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                    style="border:1px solid #ddd; border-radius:8px; background:#fff; border-collapse:separate;">
+                    <tr>
+                      <td style="padding:8px; vertical-align:middle; width:84px;">
+                        ${i.img ? `<img src="${i.img}" alt="${(i.title||'').replace(/"/g,'&quot;')}"
+                          style="width:74px; height:74px; object-fit:contain; border-radius:6px; display:block;" />` : ``}
+                      </td>
+                      <td style="padding:8px; vertical-align:middle; font-family:Arial,sans-serif;">
+                        <div style="font-size:13px; font-weight:bold; margin-bottom:4px; color:#111;">${i.title}</div>
+                        <div style="font-size:12px; color:#374151; margin-bottom:2px;">SKU: ${i.sku}</div>
+                        <div style="font-size:12px; color:#111; font-weight:bold;">${money(i.adjPrice)}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              `;
+            };
+
+            rowsHtml += `<tr>${cell(a)}${cell(b)}</tr>`;
+          }
+
+          aerproEmailBlock = `
+            <div style="margin:14px 0 22px; padding:12px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; font-family:Arial,sans-serif;">
+              <p style="margin:0 0 10px 0; font-weight:bold;">Vehicle-specific conversion parts ${apVehicleLabel ? `for ${apVehicleLabel}` : ''}</p>
+
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+                ${rowsHtml}
+              </table>
+
+              <div style="margin-top:6px; font-weight:bold; font-size:14px;">Parts subtotal: ${money(parseFloat(byId('apPartsTotal').value||'0'))}</div>
+            </div>
+          `;
+}
+      }
+
+      const closing = `
+        <p>I hope this information has been helpful in guiding you toward the right upgrade for your vehicle.</p>
+        <p>Installation usually takes a few hours, and at the moment we’re booking about 1–2 weeks in advance — so feel free to reach out to secure a spot.</p>
+        <p>If you have any questions or want to lock in a booking, don’t hesitate to get in touch.</p>
+        <p>Kind regards,<br>Shane</p>`;
+
+      byId('quotePreview').innerHTML = `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+          <tr>
+            <td align="center" style="padding:0;">
+              <!-- Email container -->
+              <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:100%; max-width:640px;">
+                <tr>
+                  <td style="font-family:Arial,sans-serif; padding:20px;">
+                    <p style="margin:0 0 10px 0;"><strong>Email:</strong> ${customerEmail}</p>
+                    <div style="border:1px solid #e5e7eb; border-radius:10px; padding:12px; margin:0 0 18px 0;">${opening}</div>
+                    ${oemHtml}
+
+                    <p style="text-align:center;font-weight:bold; margin:18px 0 10px 0;">
+                      Enjoy convenient on-site installation within our local service area — bringing professional car tech upgrades directly to you.
+                    </p>
+
+                    <img src="https://static.wixstatic.com/media/4abfde_eceea2aff22e4bc5aa317c57c9aed84b~mv2.jpg/v1/fill/w_702,h_450,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Service-Area-2.jpg"
+                         alt="Service Area"
+                         style="width:100%; max-width:640px; border-radius:4px; display:block; margin:0 0 18px 0;" />
+
+                    ${aerproEmailBlock}
+                    ${productHtml}
+                    ${showcaseHtml}
+                    ${closing}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>`;
+    
+      // Build a copy-friendly fragment containing only the selected parts + products
+      lastItemsOnlyHtml = `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+          <tr>
+            <td align="center" style="padding:0;">
+              <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse; width:100%; max-width:640px;">
+                <tr>
+                  <td style="font-family:Arial,sans-serif; padding:0 20px 20px 20px;">
+                    ${aerproEmailBlock}
+                    ${productHtml}
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      `;
+}
+
+    function copyQuoteTextOnly(){
+      const html = byId('quotePreview').innerHTML;
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      const text = temp.innerText;
+      navigator.clipboard.writeText(text).then(()=>alert('Quote text copied to clipboard!'));
+    }
+    
+    function copyItemsOnlyHtml(){
+      const html = lastItemsOnlyHtml || '';
+      if(!html){ alert('Generate a quote first.'); return; }
+      if (navigator.clipboard && window.ClipboardItem) {
+        const blob = new Blob([html], { type: "text/html" });
+        const data = [new ClipboardItem({ "text/html": blob })];
+        navigator.clipboard.write(data).then(()=>alert('Items-only HTML copied! (parts + products)')).catch(()=>copyQuoteTextOnly());
+      } else { copyQuoteTextOnly(); }
+    }
+
+function copyQuoteHtml(){
+      const html = byId('quotePreview').innerHTML;
+      if (navigator.clipboard && window.ClipboardItem) {
+        const blob = new Blob([html], { type: "text/html" });
+        const data = [new ClipboardItem({ "text/html": blob })];
+        navigator.clipboard.write(data).then(()=>alert('HTML quote copied (with images)!')).catch(()=>copyQuoteTextOnly());
+      } else { copyQuoteTextOnly(); }
+    }
+
+    
+    // Init
+    window.addEventListener('load', async () => {
+      initAerproControls();
+      // Shane default preferences: always RRP includes GST, no margin, and always include selected parts
+      try {
+        const inc = document.querySelector('input[name="gstmode"][value="inc"]');
+        if (inc) inc.checked = true;
+        const ex = document.querySelector('input[name="gstmode"][value="ex"]');
+        if (ex) ex.checked = false;
+        const mp = byId('marginPct');
+        if (mp) mp.value = '0';
+        const uq = byId('useAerproInQuote');
+        if (uq) uq.checked = true;
+      } catch(e){}
+
+      await loadAllData();
+    });
+  </script>
+</body>
+</html>
