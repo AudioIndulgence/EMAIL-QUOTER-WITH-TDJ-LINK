@@ -84,6 +84,9 @@
 <body>
   <button id="refreshQuoteBtn" title="New Quote (Refresh)" onclick="window.location.reload();">↻</button>
   <h2>Car Audio Email Quote Generator</h2>
+  <div class="hint" style="margin:0 0 14px 0; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; background:#f9fafb;">
+    Product source: this app now looks for a <b>Products</b> master tab first, then falls back to <b>Sheet1</b> for backwards compatibility.
+  </div>
   <!-- Category Selector + Product Search (search hidden for future use) -->
   <div class="category-bar" id="categoryButtons"></div>
   <div class="flex">
@@ -221,7 +224,7 @@
     // ---- CONFIG ----
     const API_KEY  = 'AIzaSyAsyikniyB7AyZxf9vkR9HryJvLhW9ui3c'; // <- your key
     const SHEET_ID = '1-EyjLxIhq_AvO0aPcStgNswzw05xc_PMfAN2f6-K3MA'; // <- your sheet
-    const PRODUCTS_TAB = 'Sheet1';
+    const PRODUCTS_TAB = 'Products';
     const EXTRAS_TAB   = 'Extras';
     const VEHICLE_PARTS_TAB = 'Vehicle Parts';
     const SHOWCASE_TAB = 'Showcase';
@@ -355,8 +358,97 @@
     async function fetchSheet(tab) {
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?key=${API_KEY}`;
       const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to load sheet "${tab}" (${res.status})`);
+      }
       const data = await res.json();
       return data.values || [];
+    }
+
+    async function fetchFirstAvailableSheet(tabNames){
+      let lastError = null;
+      for (const tab of tabNames) {
+        try {
+          const rows = await fetchSheet(tab);
+          return { tab, rows };
+        } catch (err) {
+          lastError = err;
+        }
+      }
+      throw lastError || new Error('Could not load any matching sheet.');
+    }
+
+    function normalizeHeaderName(name){
+      return (name || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function headerAliases(){
+      return {
+        id: ['id', 'product id', 'sku'],
+        active: ['active', 'enabled', 'show in app'],
+        category: ['category', 'product category'],
+        brand: ['brand', 'manufacturer'],
+        model: ['model', 'product', 'product model'],
+        description: ['description', 'desc'],
+        price: ['price', 'rrp', 'product price'],
+        install: ['install price', 'installation price', 'labour price'],
+        keyFeat: ['key features', 'features', 'feature list'],
+        imgUrl: ['image url', 'image', 'photo url', 'product image'],
+        productUrl: ['product url', 'url', 'product page', 'product link'],
+        sortOrder: ['sort order', 'category sort order', 'display order']
+      };
+    }
+
+    function findHeaderIndex(headers, aliases){
+      const normalized = headers.map(normalizeHeaderName);
+      for (const alias of aliases) {
+        const idx = normalized.indexOf(normalizeHeaderName(alias));
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    }
+
+    function parseProductsRows(rows){
+      const safeRows = rows || [];
+      if (!safeRows.length) return [];
+
+      const headers = safeRows[0] || [];
+      const aliases = headerAliases();
+      const idx = {};
+      Object.keys(aliases).forEach(key => idx[key] = findHeaderIndex(headers, aliases[key]));
+
+      return safeRows.slice(1)
+        .filter(row => row.some(cell => (cell || '').toString().trim() !== ''))
+        .filter(row => {
+          const activeVal = idx.active > -1 ? (row[idx.active] || '').toString().trim().toLowerCase() : 'true';
+          return !['false', 'no', 'n', '0', 'hide', ''].includes(activeVal);
+        })
+        .map((row, index) => ({
+          id: idx.id > -1 && row[idx.id] ? row[idx.id] : `prod_${index}`,
+          checked: false,
+          active: true,
+          category: idx.category > -1 ? (row[idx.category] || '') : '',
+          brand: idx.brand > -1 ? (row[idx.brand] || '') : '',
+          model: idx.model > -1 ? (row[idx.model] || '') : '',
+          desc: idx.description > -1 ? (row[idx.description] || '') : '',
+          price: idx.price > -1 ? parsePrice(row[idx.price]) : 0,
+          install: idx.install > -1 ? parsePrice(row[idx.install]) : 0,
+          keyFeat: idx.keyFeat > -1 ? (row[idx.keyFeat] || '') : '',
+          imgUrl: idx.imgUrl > -1 ? (row[idx.imgUrl] || '') : '',
+          productUrl: idx.productUrl > -1 ? (row[idx.productUrl] || '') : '',
+          recommended: false,
+          popular: false,
+          parts: '',
+          partsPrice: 0,
+          sortOrder: idx.sortOrder > -1 ? parsePrice(row[idx.sortOrder]) : 999
+        }))
+        .filter(p => p.brand && p.model && p.category);
     }
 
     async function loadAllData(){
@@ -369,22 +461,8 @@
         fetchSheet(OEM_TAB)
       ]);
 
-      products = (prodRows||[]).slice(7)
-        .filter(row => row[1] && row[2] && (row[4] || row[5]))
-        .map((row, idx) => ({
-          id: 'prod_' + idx,
-          checked: false,
-          brand: row[1] || '',
-          model: row[2] || '',
-          desc: row[3] || '',
-          price: parsePrice(row[4]),
-          category: row[5] || '',
-          parts: row[6] || '',
-          partsPrice: parsePrice(row[7]),
-          install: parsePrice(row[8]),
-          keyFeat: row[9] || '',
-          imgUrl: row[10] || ''
-        }));
+      products = parseProductsRows(prodRows);
+      console.log('Loaded products from tab:', PRODUCTS_TAB, 'count:', products.length);
 
       extras = (extrasRows||[]).slice(1).map((row, idx) => ({
         id: 'ex_' + idx,
@@ -497,8 +575,13 @@
             <div><label>Price:</label><input type="number" min="0" step="0.01" value="${p.price}" onchange="editProductPriceById('${p.id}', this.value)" /></div>
             <div><label>Install Price:</label><input type="number" min="0" step="0.01" value="${p.install}" onchange="editProductInstallById('${p.id}', this.value)" /></div>
             <div><label>Category:</label><span>${p.category}</span></div>
-            <div><label>Parts Price:</label><input type="number" min="0" step="0.01" value="${p.partsPrice}" onchange="editProductPartsPriceById('${p.id}', this.value)" /></div>
+            <div style="margin:6px 0 8px 0; display:flex; gap:14px; flex-wrap:wrap;">
+              <label style="font-weight:normal;"><input type="checkbox" onchange="toggleRecommendedById('${p.id}', this.checked)" ${p.recommended?'checked':''}/> ⭐ Recommended</label>
+              <label style="font-weight:normal;"><input type="checkbox" onchange="togglePopularById('${p.id}', this.checked)" ${p.popular?'checked':''}/> 🔥 Popular</label>
+            </div>
             <div><label>Key Features:</label><textarea onchange="editProductKeyFeatById('${p.id}', this.value)">${p.keyFeat}</textarea></div>
+            <div><label>Product URL:</label><input type="text" value="${p.productUrl || ''}" onchange="editProductUrlById('${p.id}', this.value)" placeholder="https://..." /></div>
+            ${p.productUrl ? `<div style="margin-top:6px;"><a href="${p.productUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#f5edfa;border:1px solid #9b59b6;color:#6b21a8;padding:6px 10px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:bold;">Open product page ↗</a></div>` : ''}
           </div>
                   </td>
                 </tr>
@@ -510,10 +593,24 @@
     }
     byId('productSearch').addEventListener('input', renderProductList);
     window.toggleProductById = id => { const p=products.find(x=>x.id===id); if(p){ p.checked=!p.checked; renderExtrasList(); refreshShowcaseSuggestions(); } }
+    window.toggleRecommendedById = (id, checked) => {
+      const p=products.find(x=>x.id===id);
+      if(!p) return;
+      p.recommended = checked;
+      if(checked) p.popular = false;
+      renderProductList();
+    }
+    window.togglePopularById = (id, checked) => {
+      const p=products.find(x=>x.id===id);
+      if(!p) return;
+      p.popular = checked;
+      if(checked) p.recommended = false;
+      renderProductList();
+    }
     window.editProductPriceById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.price=parsePrice(v);}
     window.editProductInstallById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.install=parsePrice(v);}
-    window.editProductPartsPriceById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.partsPrice=parsePrice(v);}
     window.editProductKeyFeatById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.keyFeat=v;}
+    window.editProductUrlById=(id,v)=>{const p=products.find(x=>x.id===id); if(p) p.productUrl=(v||'').trim();}
 
     function renderExtrasList(){
       const div = byId('extrasList');
@@ -849,8 +946,6 @@ byId('apFilter')?.addEventListener('input', ()=>{});
       const oemManual = byId('oemRadioManual').value.trim();
       const oemUrl = selectedOEMUrl || oemManual;
 
-      const checkedParts = Array.from(document.querySelectorAll('.vehiclePartCheckbox:checked')).map(cb => cb.value);
-      const manualVehiclePartsList = checkedParts.join(', ');
 
       const selected = products.filter(p => p.checked);
       if(!selected.length){ alert('No products selected.'); return; }
@@ -865,18 +960,19 @@ byId('apFilter')?.addEventListener('input', ()=>{});
       }
 
       let productHtml = '';
-      selected.forEach(item => {
-        let usePartsName = item.parts;
-        let usePartsPrice = item.partsPrice;
+      const optionCountByCategory = {};
 
-        if(item.category.toLowerCase() === 'indash av'){
-          if(useAerpro && apSelectedItems.length){
-            usePartsName = apSKUsUsed.join(', ');
-            usePartsPrice = apPartsTotalUsed;
-          } else if (vehiclePartsPrice > 0) {
-            usePartsName = manualVehiclePartsList;
-            usePartsPrice = vehiclePartsPrice;
-          }
+      selected.forEach(item => {
+        const categoryKey = (item.category || 'Other').toLowerCase();
+        optionCountByCategory[categoryKey] = (optionCountByCategory[categoryKey] || 0) + 1;
+        const optionNumber = optionCountByCategory[categoryKey];
+
+        let usePartsName = '';
+        let usePartsPrice = 0;
+
+        if(item.category.toLowerCase() === 'indash av' && useAerpro && apSelectedItems.length){
+          usePartsName = apSKUsUsed.join(', ');
+          usePartsPrice = apPartsTotalUsed;
         }
 
         const itemExtras = extras.filter(e => e.checked && e.category && e.category.toLowerCase() === item.category.toLowerCase());
@@ -888,6 +984,7 @@ byId('apFilter')?.addEventListener('input', ()=>{});
           <h2>📦 <span style="color:#0066cc;">${item.brand} ${item.model}</span></h2>
           ${item.imgUrl ? `<img src="${item.imgUrl}" alt="${(item.brand||'') + ' ' + (item.model||'')}" style="width:100%;max-width:360px;height:auto;display:block;margin:10px auto 12px auto;border-radius:8px;" />` : ''}
           <p><strong>🔍 Description:</strong> ${item.desc}</p>
+          ${item.productUrl ? `<div style="margin:8px 0 12px 0;"><a href="${item.productUrl}" style="display:inline-block;background-color:#9b59b6;color:#ffffff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:bold;">View Full Product Details</a></div>` : ''}
           ${showKeyFeatures && item.keyFeat ? `<p><strong>🌟 Key Features:</strong><br />${item.keyFeat}</p>` : ''}
           ${item.category.toLowerCase() === 'indash av' ? `
             <p>🔧 <strong>Included Installation Parts:</strong></p>
@@ -905,7 +1002,10 @@ byId('apFilter')?.addEventListener('input', ()=>{});
                   </div>`).join('')}
               </div>
             </div>` : ''}
-          <div style="margin-top:10px;padding:10px;border:2px solid #9b59b6;border-radius:8px;background-color:#f5edfa;text-align:center;font-size:18px;font-weight:bold;">✅ Complete Installed Package: $${totalInstalled.toFixed(2)}</div>
+          <div style="margin-top:10px;padding:10px;border:2px solid #9b59b6;border-radius:8px;background-color:#f5edfa;text-align:center;font-size:18px;font-weight:bold;">
+            ✅ Option ${optionNumber} – Installed: $${totalInstalled.toFixed(2)}
+            ${(item.recommended || item.popular) ? `<div style="margin-top:6px;font-size:14px;color:#6b21a8;font-weight:bold;">${item.recommended ? '⭐ Recommended' : '🔥 Popular'}</div>` : ''}
+          </div>
         </div>`;
       });
 
